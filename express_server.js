@@ -2,6 +2,8 @@ const express = require("express");
 const app = express();
 const PORT = 8080; // default port 8080
 app.set("view engine", "ejs") ;
+const  cookieParser = require('cookie-parser');
+app.use(cookieParser());
 
 //using the body-parser library to make the POST request body human readable
 const bodyParser = require("body-parser");
@@ -17,20 +19,44 @@ const urlDatabase = {
   "9sm5xK": "http://www.google.com"
 };
 
+//log in and create a cookie
+app.post("/login", (req, res) => {
+  const username = req.body.username;
+  res.cookie("username",username);
+  res.redirect("/urls")
+});
+
+//log out and clear the cookie
+app.post("/logout", (req, res) => {
+  res.clearCookie("username");
+  res.redirect("/urls")
+});
 // adding a route to urls using template engine
 app.get("/urls", (req, res) => {
-  const templateVars = { urls: urlDatabase };
+  let templateVars = {
+     urls: urlDatabase, 
+     username : req.cookies["username"]
+    };
+
+ 
+
   res.render("urls_index", templateVars);
 });
 
 //add a get route to show the form
 app.get("/urls/new", (req, res) => {
-  res.render("urls_new")
+  let templateVars = {
+    username : req.cookies["username"]
+   };
+  res.render("urls_new",templateVars)
 });
 
 //Render information about a single URL
 app.get("/urls/:shortURL", (req, res) => {
-  const templateVars = { shortURL : req.params.shortURL, longURL : urlDatabase[req.params.shortURL] };
+  const templateVars = { shortURL : req.params.shortURL,
+     longURL : urlDatabase[req.params.shortURL],
+     username : req.cookies["username"]
+     };
   res.render("urls_show", templateVars);
 });
 

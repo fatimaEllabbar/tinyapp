@@ -36,15 +36,16 @@ app.get("/urls/:shortURL", (req, res) => {
 
 //created a route to handle the POST requests from our form
 app.post("/urls", (req, res) => {
-  console.log(req.body);  // Log the POST request body to the console
-  res.send("Ok");         // Respond with 'Ok' (we will replace this)
+  const shortURL = generateRandomString();
+  urlDatabase[shortURL] = req.body.longURL;
+  res.redirect(`/urls/${shortURL}`);       
 });
 
-
-
-
-
- 
+//Redirect any request to "/u/:shortURL" to its longURL
+app.get("/u/:shortURL", (req, res) => {
+  const longURL = urlDatabase[req.params.shortURL]
+  res.redirect(longURL);
+});
 
 
 app.listen(PORT, () => {

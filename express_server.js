@@ -1,28 +1,21 @@
 const express = require("express");
+const bodyParser = require("body-parser");
+const  cookieParser = require('cookie-parser');
 const PORT = 8080; // default port 8080
 
 const app = express();
 
 app.set("view engine", "ejs") ;
-
-const  cookieParser = require('cookie-parser');
 app.use(cookieParser());
-
 //using the body-parser library to make the POST request body human readable
-const bodyParser = require("body-parser");
 app.use(bodyParser.urlencoded({extended: true}));
 
-// generating a "unique" shortURL by returning a string of 6 random alphanumeric characters
-function generateRandomString() {
-  return Math.random().toString(36).substring(2,8);
-}
-
+// our database
 const urlDatabase = {
   b6UTxQ: { longURL: "https://www.tsn.ca", userID: "aJ48lW" },
   i3BoGr: { longURL: "https://www.google.ca", userID: "aJ48lW" },
   b2xVn2: { longURL: "http://www.lighthouselabs.ca", userID: "rT5e4W"}
 };
-
 
 const users = { 
   "aJ48lW": {
@@ -36,6 +29,12 @@ const users = {
     password: "1234"
   }
 }
+
+// generating a "unique" shortURL by returning a string of 6 random alphanumeric characters
+const generateRandomString = ()=> {
+  return Math.random().toString(36).substring(2,8);
+}
+
 // return urls for user that has the id
 const urlsForUser = (id)=> {
   const urls = {};
@@ -47,14 +46,7 @@ const urlsForUser = (id)=> {
   return urls;
 }
 
-//adding registration 
-app.get("/register", (req, res) => {
-  let templateVars = {
-    user : users[req.cookies["user_id"]]
-   };
-  res.render("registration",templateVars);
-})
-// lookup for an email
+//lookup for an email and return the user that has this email
 const emailExists = (email) => {
   for (let key in users) {
     if (users[key].email === email) {
@@ -63,6 +55,16 @@ const emailExists = (email) => {
   }
   return null;
 } 
+
+//display the form for registration
+app.get("/register", (req, res) => {
+  let templateVars = {
+    user : users[req.cookies["user_id"]]
+   };
+  res.render("registration",templateVars);
+})
+
+// create a new user
 app.post("/register", (req, res) => {
   if(req.body.email && req.body.password && emailExists(req.body.email) === null){
     const userRandomID = generateRandomString();
@@ -73,26 +75,29 @@ app.post("/register", (req, res) => {
     };
     res.cookie("user_id", users[userRandomID].id);
     res.redirect("/urls");
+  } else if (req.body.email && req.body.password && emailExists(req.body.email)) {
+    res.status(400).send("This email exists already!")
   } else {
-    res.statusCode = 400;
-    res.sendStatus(res.statusCode);
+    res.status(400).send("Email or password invalid");
   }
 });
 
-//log in 
+//diplay the form for log in
 app.get("/login", (req, res) =>{
   let templateVars = {
     user : users[req.cookies["user_id"]]
    };
   res.render("login",templateVars);
 });
+
+//log in 
 app.post("/login", (req, res) => {
   const user = emailExists(req.body.email);
   if(user && user.password === req.body.password) {
     res.cookie("user_id",user.id);
     res.redirect("/urls");
   } else {
-    res.sendStatus(403);
+    res.status(403).send("Email or password invalid");
   }
 });
 
@@ -103,7 +108,7 @@ app.post("/logout", (req, res) => {
 });
 
 
-// adding a route to urls using template engine
+// display all the urls for a specific user
 app.get("/urls", (req, res) => {
   if (req.cookies['user_id']) {
     const templateVars = {
@@ -113,7 +118,7 @@ app.get("/urls", (req, res) => {
    res.render("urls_index", templateVars);
   } else {
     const templateVars = { 
-      user : users[req.cookies["user_id"]],
+      user : null,
       msg : "you must register or log in first"
      };
     res.render("message",templateVars);
@@ -121,7 +126,7 @@ app.get("/urls", (req, res) => {
   
 });
 
-//add a get route to show the form
+//display th form to add a new url
 app.get("/urls/new", (req, res) => {
   if(req.cookies["user_id"]){
     let templateVars = {
@@ -143,14 +148,14 @@ app.get("/urls/:shortURL", (req, res) => {
     res.render("urls_show", templateVars);
   } else {
     const templateVars = { 
-      user : users[req.cookies["user_id"]],
+      user : null,
       msg : "you must register or log in first or you don't have the right to display this url"
      };
     res.render("message",templateVars);
   }
 });
 
-//created a route to handle the POST requests from our form
+//create a new url
 app.post("/urls", (req, res) => {
   const shortURL = generateRandomString();
   urlDatabase[shortURL] = {
@@ -160,8 +165,8 @@ app.post("/urls", (req, res) => {
   res.redirect(`/urls/${shortURL}`);       
 });
 
-// delete a url
-app.post('/urls/:shortURL/delete',(req, res) => {
+// delete an url
+app.post('/urls/:shortURL',(req, res) => {
   if(req.cookies['user_id'] && urlsForUser(req.cookies['user_id']).hasOwnProperty(req.params.shortURL)) {
     const key = req.params.shortURL;
     delete urlDatabase[key];
@@ -175,7 +180,7 @@ app.post('/urls/:shortURL/delete',(req, res) => {
   }
 });
 
-// update a url
+// update an url
 app.post('/urls/:shortURL/update',(req, res) => {
   if(req.cookies['user_id'] && urlsForUser(req.cookies['user_id']).hasOwnProperty(req.params.shortURL)) {
   const key = req.params.shortURL;

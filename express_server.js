@@ -18,21 +18,33 @@ function generateRandomString() {
 }
 
 const urlDatabase = {
-  "b2xVn2": "http://www.lighthouselabs.ca",
-  "9sm5xK": "http://www.google.com"
+  b6UTxQ: { longURL: "https://www.tsn.ca", userID: "aJ48lW" },
+  i3BoGr: { longURL: "https://www.google.ca", userID: "aJ48lW" },
+  b2xVn2: { longURL: "http://www.lighthouselabs.ca", userID: "rT5e4W"}
 };
 
+
 const users = { 
-  "userRandomID": {
-    id: "userRandomID", 
+  "aJ48lW": {
+    id: "aJ48lW", 
     email: "user@example.com", 
-    password: "purple-monkey-dinosaur"
+    password: "user"
   },
- "user2RandomID": {
-    id: "user2RandomID", 
+ "rT5e4W": {
+    id: "rT5e4W", 
     email: "user2@example.com", 
-    password: "dishwasher-funk"
+    password: "1234"
   }
+}
+// return urls for user that has the id
+const urlsForUser = (id)=> {
+  const urls = {};
+  for (let key in urlDatabase) {
+    if (urlDatabase[key].userID === id) {
+      urls[key] = urlDatabase[key];
+    }
+  }
+  return urls;
 }
 
 //adding registration 
@@ -93,57 +105,94 @@ app.post("/logout", (req, res) => {
 
 // adding a route to urls using template engine
 app.get("/urls", (req, res) => {
-  let templateVars = {
-     urls: urlDatabase, 
-     user : users[req.cookies["user_id"]]
-    };
-
- 
-
-  res.render("urls_index", templateVars);
+  if (req.cookies['user_id']) {
+    const templateVars = {
+      urls: urlsForUser(req.cookies['user_id']), 
+      user : users[req.cookies["user_id"]]
+     };
+   res.render("urls_index", templateVars);
+  } else {
+    const templateVars = { 
+      user : users[req.cookies["user_id"]],
+      msg : "you must register or log in first"
+     };
+    res.render("message",templateVars);
+  }
+  
 });
 
 //add a get route to show the form
 app.get("/urls/new", (req, res) => {
-  let templateVars = {
-    user : users[req.cookies["user_id"]]
-   };
-  res.render("urls_new",templateVars)
+  if(req.cookies["user_id"]){
+    let templateVars = {
+      user : users[req.cookies["user_id"]]
+     };
+    res.render("urls_new",templateVars)
+  } else {
+    res.redirect("/login");
+  }
 });
 
 //Render information about a single URL
 app.get("/urls/:shortURL", (req, res) => {
-  const templateVars = { shortURL : req.params.shortURL,
-     longURL : urlDatabase[req.params.shortURL],
-     user : users[req.cookies["user_id"]]
+ if(req.cookies['user_id'] && urlsForUser(req.cookies['user_id']).hasOwnProperty(req.params.shortURL)) {
+    const templateVars = { shortURL : req.params.shortURL,
+      longURL : urlDatabase[req.params.shortURL].longURL,
+      user : users[req.cookies["user_id"]]
+      };
+    res.render("urls_show", templateVars);
+  } else {
+    const templateVars = { 
+      user : users[req.cookies["user_id"]],
+      msg : "you must register or log in first or you don't have the right to display this url"
      };
-  res.render("urls_show", templateVars);
+    res.render("message",templateVars);
+  }
 });
 
 //created a route to handle the POST requests from our form
 app.post("/urls", (req, res) => {
   const shortURL = generateRandomString();
-  urlDatabase[shortURL] = req.body.longURL;
+  urlDatabase[shortURL] = {
+    longURL : req.body.longURL,
+    userID : req.cookies['user_id']
+  }
   res.redirect(`/urls/${shortURL}`);       
 });
 
 // delete a url
 app.post('/urls/:shortURL/delete',(req, res) => {
-  const key = req.params.shortURL;
-  delete urlDatabase[key];
-  res.redirect("/urls");
+  if(req.cookies['user_id'] && urlsForUser(req.cookies['user_id']).hasOwnProperty(req.params.shortURL)) {
+    const key = req.params.shortURL;
+    delete urlDatabase[key];
+    res.redirect("/urls");
+  } else {
+    const templateVars = { 
+      user : users[req.cookies["user_id"]],
+      msg : "you must register or log in first or you don't have the right to delete this url"
+     };
+    res.render("message",templateVars);
+  }
 });
 
 // update a url
 app.post('/urls/:shortURL/update',(req, res) => {
+  if(req.cookies['user_id'] && urlsForUser(req.cookies['user_id']).hasOwnProperty(req.params.shortURL)) {
   const key = req.params.shortURL;
-  urlDatabase[key] = req.body.newURL;
+  urlDatabase[key].longURL = req.body.newURL;
   res.redirect("/urls");
+} else {
+  const templateVars = { 
+    user : users[req.cookies["user_id"]],
+    msg : "you must register or log in first or you don't have the right to update this url"
+   };
+  res.render("message",templateVars);
+}
 });
 
 //Redirect any request to "/u/:shortURL" to its longURL
 app.get("/u/:shortURL", (req, res) => {
-  const longURL = urlDatabase[req.params.shortURL]
+  const longURL = urlDatabase[req.params.shortURL].longURL;
   res.redirect(longURL);
 });
 

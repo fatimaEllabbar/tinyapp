@@ -56,10 +56,14 @@ const urlsForUser = (id)=> {
 
 //display the form for registration
 app.get("/register", (req, res) => {
-  let templateVars = {
-    user : users[req.session["user_id"]]
-   };
-  res.render("registration",templateVars);
+  if (req.session['user_id']) {
+    res.redirect('/urls');
+  } else {
+    let templateVars = {
+      user : users[req.session["user_id"]]
+     };
+    res.render("registration",templateVars);
+  }
 })
 
 // create a new user
@@ -82,10 +86,14 @@ app.post("/register", (req, res) => {
 
 //diplay the form for log in
 app.get("/login", (req, res) =>{
-  let templateVars = {
-    user : users[req.session["user_id"]]
-   };
-  res.render("login",templateVars);
+  if (req.session['user_id']) {
+    res.redirect('/urls');
+  } else {
+    let templateVars = {
+      user : users[req.session["user_id"]]
+     };
+    res.render("login",templateVars);
+  }
 });
 
 //log in 
@@ -138,65 +146,101 @@ app.get("/urls/new", (req, res) => {
 
 //Render information about a single URL
 app.get("/urls/:shortURL", (req, res) => {
+  let msg = "";
  if(req.session['user_id'] && urlsForUser(req.session['user_id']).hasOwnProperty(req.params.shortURL)) {
     const templateVars = { shortURL : req.params.shortURL,
       longURL : urlDatabase[req.params.shortURL].longURL,
       user : users[req.session["user_id"]]
       };
     res.render("urls_show", templateVars);
+    return; 
+  } else if (!req.session['user_id']) {
+    msg = "You must register or log in first"
+  } else if( urlDatabase[req.params.shortURL]) {
+    msg = "You don't have the right to display this url";
   } else {
-    const templateVars = { 
-      user : null,
-      msg : "you must register or log in first or you don't have the right to display this url"
-     };
-    res.render("message",templateVars);
+    msg = "The short url does not exist";
   }
+  const templateVars = { 
+    user : users[req.session["user_id"]],
+    msg 
+   };
+   res.render("message",templateVars);
 });
 
 //create a new url
 app.post("/urls", (req, res) => {
-  const shortURL = generateRandomString();
-  urlDatabase[shortURL] = {
+  if (req.session['user_id']) {
+    const shortURL = generateRandomString();
+    urlDatabase[shortURL] = {
     longURL : req.body.longURL,
     userID : req.session['user_id']
-  }
-  res.redirect(`/urls/${shortURL}`);       
-});
-
-// delete an url
-app.post('/urls/:shortURL',(req, res) => {
-  if(req.session['user_id'] && urlsForUser(req.session['user_id']).hasOwnProperty(req.params.shortURL)) {
-    const key = req.params.shortURL;
-    delete urlDatabase[key];
-    res.redirect("/urls");
+    }
+    res.redirect(`/urls/${shortURL}`); 
   } else {
     const templateVars = { 
       user : users[req.session["user_id"]],
-      msg : "you must register or log in first or you don't have the right to delete this url"
+      msg : "You must register or log in first"
      };
     res.render("message",templateVars);
+  }        
+});
+
+// delete an url
+app.post('/urls/:shortURL/delete',(req, res) => {
+  if (req.session['user_id'] && urlsForUser(req.session['user_id']).hasOwnProperty(req.params.shortURL)) {
+    const key = req.params.shortURL;
+    delete urlDatabase[key];
+    res.redirect("/urls");
+    return ;
+  } else if (!req.session['user_id']) {
+    msg = "You must register or log in first"
+  } else if(urlDatabase[req.params.shortURL]) {
+    msg = "You don't have the right to delete this url";
+  } else {
+    msg = "The short url does not exist";
   }
+  const templateVars = { 
+    user : users[req.session["user_id"]],
+    msg 
+   };
+   res.render("message",templateVars);
 });
 
 // update an url
-app.post('/urls/:shortURL/update',(req, res) => {
+app.post('/urls/:shortURL',(req, res) => {
+  let msg = "";
   if(req.session['user_id'] && urlsForUser(req.session['user_id']).hasOwnProperty(req.params.shortURL)) {
-  const key = req.params.shortURL;
-  urlDatabase[key].longURL = req.body.newURL;
-  res.redirect("/urls");
-} else {
+    const key = req.params.shortURL;
+    urlDatabase[key].longURL = req.body.newURL;
+    res.redirect("/urls");
+    return ;
+  } else if (!req.session['user_id']) {
+    msg = "You must register or log in first"
+  } else if(urlDatabase[req.params.shortURL]) {
+    msg = "You don't have the right to update this url";
+  } else {
+    msg = "The short url does not exist";
+  }
   const templateVars = { 
     user : users[req.session["user_id"]],
-    msg : "you must register or log in first or you don't have the right to update this url"
+    msg 
    };
-  res.render("message",templateVars);
-}
+   res.render("message",templateVars);
 });
 
 //Redirect any request to "/u/:shortURL" to its longURL
 app.get("/u/:shortURL", (req, res) => {
-  const longURL = urlDatabase[req.params.shortURL].longURL;
-  res.redirect(longURL);
+  if (urlDatabase[req.params.shortURL]){
+    const longURL = urlDatabase[req.params.shortURL].longURL;
+    res.redirect(longURL);
+  } else {
+    const templateVars = { 
+      user : users[req.session["user_id"]],
+      msg : "The URL for the given ID does not exist:"
+    };
+    res.render("message",templateVars);
+  }
 });
 
 
